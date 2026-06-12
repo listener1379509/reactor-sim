@@ -110,11 +110,29 @@ sol = solve_ivp(
     t_eval=t_eval,
     method="Radau"
 )
+if not sol.success:
+    st.error("Solver failed to converge.")
+    st.stop()
 
-phi = sol.y[:N]
+phi_time = sol.y[:N, :]
+phi = phi_time
 
 # =========================
-# VISUALIZATION
+# VISUALIZATION SELECTOR
+# =========================
+
+view = st.selectbox(
+    "Visualization Mode",
+    [
+        "Flux Plot",
+        "Heat Map",
+        "Animated Core",
+        "Temperature"
+    ]
+)
+
+# =========================
+# STANDARD PLOTS
 # =========================
 
 col1, col2 = st.columns(2)
@@ -122,7 +140,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Core Flux Shape (Final State)")
     fig, ax = plt.subplots()
-    ax.plot(phi[:, -1], color="orange")
+    ax.plot(phi[:, -1])
     ax.set_xlabel("Core Position")
     ax.set_ylabel("Flux")
     ax.grid()
@@ -131,16 +149,189 @@ with col1:
 with col2:
     st.subheader("Center Power vs Time")
     fig2, ax2 = plt.subplots()
-    ax2.plot(sol.t, phi[N//2], color="blue")
+    ax2.plot(sol.t, phi[N//2])
     ax2.set_xlabel("Time (s)")
     ax2.set_ylabel("Flux")
     ax2.grid()
     st.pyplot(fig2)
 
 # =========================
+# HEAT MAP
+# =========================
+
+if view == "Flux Plot":
+    st.info("Showing standard flux and power plots above.")
+
+elif view == "Heat Map":
+
+    st.subheader("Neutron Flux Heat Map")
+
+    heatmap = np.tile(phi[:, -1], (10, 1))
+
+    fig, ax = plt.subplots()
+
+    im = ax.imshow(
+        heatmap,
+        aspect="auto",
+        origin="lower"
+    )
+
+    plt.colorbar(im, ax=ax)
+
+    st.pyplot(fig)
+
+# =========================
+# ANIMATED CORE
+# =========================
+
+elif view == "Animated Core":
+
+    st.subheader("Animated Reactor Core")
+
+    time_idx = st.slider(
+        "Simulation Time",
+        0,
+        len(sol.t)-1,
+        len(sol.t)-1
+    )
+
+    current_flux = phi[:, time_idx]
+
+    current_flux = np.nan_to_num(
+        current_flux,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0
+    )
+
+    core = current_flux.reshape(5, 6)
+
+    fig, ax = plt.subplots()
+
+    im = ax.imshow(
+        core,
+        aspect="equal",
+        origin="lower"
+    )
+
+    plt.colorbar(
+        im,
+        ax=ax,
+        label="Neutron Flux"
+    )
+
+    for rp in rod_positions:
+
+        row = rp // 6
+        col = rp % 6
+
+        ax.scatter(
+            col,
+            row,
+            marker="X",
+            s=200
+        )
+
+    ax.set_title(
+        f"Core State at t={sol.t[time_idx]:.2f} s"
+    )
+
+    st.pyplot(fig)
+
+# =========================
+# TEMPERATURE VIEW
+# =========================
+
+elif view == "Temperature":
+
+    st.subheader("Core Temperature Map")
+
+    time_idx = st.slider(
+        "Simulation Time",
+        0,
+        len(sol.t)-1,
+        len(sol.t)-1,
+        key="temp_slider"
+    )
+
+    current_flux = np.maximum(
+        phi[:, time_idx],
+        0
+    )
+
+    current_flux = np.nan_to_num(
+        current_flux,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0
+    )
+
+    core = current_flux.reshape(5, 6)
+
+    max_flux = np.max(core)
+
+    if max_flux > 0:
+        temperature = 300 + 500 * (
+            core / max_flux
+        )
+    else:
+        temperature = np.full_like(
+            core,
+            300
+        )
+
+    fig, ax = plt.subplots()
+
+    im = ax.imshow(
+        temperature,
+        aspect="equal",
+        origin="lower"
+    )
+
+    plt.colorbar(
+        im,
+        ax=ax,
+        label="Temperature (K)"
+    )
+
+    for rp in rod_positions:
+
+        row = rp // 6
+        col = rp % 6
+
+        ax.scatter(
+            col,
+            row,
+            marker="X",
+            s=200
+        )
+
+    ax.set_title(
+        f"Estimated Core Temperature at t={sol.t[time_idx]:.2f} s"
+    )
+
+    st.pyplot(fig)
+
+    colA, colB = st.columns(2)
+
+    with colA:
+        st.metric(
+            "Peak Temperature",
+            f"{temperature.max():.1f} K"
+        )
+
+    with colB:
+        st.metric(
+            "Average Temperature",
+            f"{temperature.mean():.1f} K"
+        )
+
+   
+# =========================
 # EXTRA INFO PANEL
 # =========================
 st.markdown("### System Info")
 st.write(f"Rods inserted: {num_rods}")
 st.write(f"Base reactivity: {rho_base}")
+st.write("Model: 1D diffusion + 6-group delayed neutrons")
 st.write("Model: 1D diffusion + 6-group delayed neutrons")
