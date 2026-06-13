@@ -21,6 +21,8 @@ import time
 # =========================
 st.set_page_config(page_title="Reactor Simulator", layout="wide")
 st.title("Educational Reactor Control Rod Simulator")
+if "scram_active" not in st.session_state:
+    st.session_state.scram_active = False
 
 # =========================
 # CORE PARAMETERS
@@ -42,6 +44,26 @@ Lambda = 1e-4
 st.sidebar.header("Controls")
 
 rho_base = st.sidebar.slider("Base Reactivity", -0.005, 0.005, 0.002, 0.0001)
+xenon = st.sidebar.slider(
+    "Xenon Concentration",
+    0.0,
+    1.0,
+    0.2
+)
+
+void_coeff = st.sidebar.slider(
+    "Void Coefficient",
+    -0.005,
+    0.005,
+    -0.001
+)
+
+void_fraction = st.sidebar.slider(
+    "Void Fraction",
+    0.0,
+    1.0,
+    0.0
+)
 
 num_rods = st.sidebar.slider("Number of Control Rods", 0, 10, 2)
 
@@ -52,6 +74,11 @@ for i in range(num_rods):
     )
 
 rod_strength = st.sidebar.slider("Rod Strength", 0.0, 0.01, 0.003, 0.0001)
+
+if st.sidebar.button("🚨 SCRAM"):
+    st.session_state.scram_active = True
+if st.sidebar.button("🔄 Reset Reactor"):
+    st.session_state.scram_active = False
 
 sigma = 2.0
 
@@ -78,9 +105,26 @@ def unpack(y):
 # REACTIVITY FIELD (CONTROL RODS)
 # =========================
 def rho_field(i):
+
     rho = rho_base
-    for rp in rod_positions:
-        rho -= rod_strength * np.exp(-((i - rp)**2)/(2*sigma**2))
+
+    # SCRAM inserts all rods
+    if st.session_state.scram_active:
+
+        rho -= 0.02
+
+        for forced_pos in range(N):
+            rho -= 0.001 * np.exp(
+                -((i - forced_pos)**2)/(2*sigma**2)
+            )
+
+    else:
+
+        for rp in rod_positions:
+            rho -= rod_strength * np.exp(
+                -((i - rp)**2)/(2*sigma**2)
+            )
+
     return rho
 
 # =========================
@@ -209,6 +253,24 @@ elif view == "Animated Core":
         0
     )
 
+    time_idx = st.slider(
+        "Simulation Time",
+        0,
+        len(sol.t)-1,
+        len(sol.t)-1
+    )
+
+    ...
+
+    if st.session_state.scram_active:
+        ax.set_title(
+            f"🚨 SCRAM ACTIVE | t={sol.t[time_idx]:.2f} s"
+        )
+    else:
+        ax.set_title(
+            f"Core State at t={sol.t[time_idx]:.2f} s"
+        )
+
     plot_area = st.empty()
 
     if autoplay:
@@ -305,8 +367,18 @@ elif view == "Animated Core":
         ax.set_title(
             f"Core State at t={sol.t[frame]:.2f} s"
         )
+     
 
         plot_area.pyplot(fig)
+    
+    if st.session_state.scram_active:
+       ax.set_title(
+        f"🚨 SCRAM ACTIVE | t={sol.t[time_idx]:.2f} s"
+    )
+    else:
+       ax.set_title(
+        f"Core State at t={sol.t[time_idx]:.2f} s"
+    )
 
 # =========================
 # TEMPERATURE VIEW
@@ -400,6 +472,43 @@ elif view == "Temperature":
 # =========================
 # EXTRA INFO PANEL
 # =========================
+power = np.sum(phi[:, -1])
+
+k_eff = 1 + rho_base
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "Reactor Power",
+        f"{power:.2f}"
+    )
+
+with col2:
+    st.metric(
+        "k-effective",
+        f"{k_eff:.4f}"
+    )
+
+with col3:
+    st.metric(
+        "Xenon Level",
+        f"{xenon:.2f}"
+    )
+if k_eff < 1:
+    st.warning("Subcritical")
+
+elif k_eff > 1:
+    st.error("Supercritical")
+
+else:
+    st.success("Critical")
+if st.session_state.scram_active:
+    st.error("🚨 SCRAM ACTIVE - Reactor Shutdown Initiated")
+if st.session_state.scram_active:
+    st.error("🚨 SCRAM ACTIVE")
+else:
+    st.success("Reactor Operating")
 st.markdown("### System Info")
 st.write(f"Rods inserted: {num_rods}")
 st.write(f"Base reactivity: {rho_base}")
