@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+import time
 
 # =========================
 # PAGE SETUP
@@ -188,55 +189,113 @@ elif view == "Animated Core":
 
     st.subheader("Animated Reactor Core")
 
-    time_idx = st.slider(
-        "Simulation Time",
+    autoplay = st.checkbox("▶ Auto Play")
+
+    frame = st.slider(
+        "Frame",
         0,
-        len(sol.t)-1,
-        len(sol.t)-1
+        len(sol.t) - 1,
+        0
     )
 
-    current_flux = phi[:, time_idx]
+    plot_area = st.empty()
 
-    current_flux = np.nan_to_num(
-        current_flux,
-        nan=0.0,
-        posinf=0.0,
-        neginf=0.0
-    )
+    if autoplay:
 
-    core = current_flux.reshape(5, 6)
+        for time_idx in range(len(sol.t)):
 
-    fig, ax = plt.subplots()
+            current_flux = phi[:, time_idx]
 
-    im = ax.imshow(
-        core,
-        aspect="equal",
-        origin="lower"
-    )
+            current_flux = np.nan_to_num(
+                current_flux,
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0
+            )
 
-    plt.colorbar(
-        im,
-        ax=ax,
-        label="Neutron Flux"
-    )
+            core = current_flux.reshape(5, 6)
 
-    for rp in rod_positions:
+            fig, ax = plt.subplots()
 
-        row = rp // 6
-        col = rp % 6
+            im = ax.imshow(
+                core,
+                aspect="equal",
+                origin="lower",
+                animated=True
+            )
 
-        ax.scatter(
-            col,
-            row,
-            marker="X",
-            s=200
+            plt.colorbar(
+                im,
+                ax=ax,
+                label="Neutron Flux"
+            )
+
+            for rp in rod_positions:
+
+                row = rp // 6
+                col = rp % 6
+
+                ax.scatter(
+                    col,
+                    row,
+                    marker="X",
+                    s=200
+                )
+
+            ax.set_title(
+                f"Core State at t={sol.t[time_idx]:.2f} s"
+            )
+
+            plot_area.pyplot(fig)
+
+            plt.close(fig)
+
+            time.sleep(0.05)
+
+    else:
+
+        current_flux = phi[:, frame]
+
+        current_flux = np.nan_to_num(
+            current_flux,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0
         )
 
-    ax.set_title(
-        f"Core State at t={sol.t[time_idx]:.2f} s"
-    )
+        core = current_flux.reshape(5, 6)
 
-    st.pyplot(fig)
+        fig, ax = plt.subplots()
+
+        im = ax.imshow(
+            core,
+            aspect="equal",
+            origin="lower"
+        )
+
+        plt.colorbar(
+            im,
+            ax=ax,
+            label="Neutron Flux"
+        )
+
+        for rp in rod_positions:
+
+            row = rp // 6
+            col = rp % 6
+
+            ax.scatter(
+                col,
+                row,
+                marker="X",
+                s=200
+            )
+
+        ax.set_title(
+            f"Core State at t={sol.t[frame]:.2f} s"
+        )
+
+        plot_area.pyplot(fig)
 
 # =========================
 # TEMPERATURE VIEW
