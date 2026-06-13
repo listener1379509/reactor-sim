@@ -1,5 +1,17 @@
 import streamlit as st
 import numpy as np
+
+beta_i = np.array([
+    0.000215, 0.001424, 0.001274,
+    0.002568, 0.000748, 0.000273
+])
+
+lambda_i = np.array([
+    0.0124, 0.0305, 0.111,
+    0.301, 1.14, 3.01
+])
+
+beta = np.sum(beta_i)
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 import time
@@ -181,9 +193,8 @@ elif view == "Heat Map":
 
     st.pyplot(fig)
 
-# =========================
-# ANIMATED CORE
-# =========================
+
+
 
 elif view == "Animated Core":
 
@@ -385,12 +396,11 @@ elif view == "Temperature":
             f"{temperature.mean():.1f} K"
         )
 
-   
+
 # =========================
 # EXTRA INFO PANEL
 # =========================
 st.markdown("### System Info")
 st.write(f"Rods inserted: {num_rods}")
 st.write(f"Base reactivity: {rho_base}")
-st.write("Model: 1D diffusion + 6-group delayed neutrons")
 st.write("Model: 1D diffusion + 6-group delayed neutrons")
